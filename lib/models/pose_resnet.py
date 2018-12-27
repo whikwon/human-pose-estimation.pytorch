@@ -248,29 +248,29 @@ class PoseResNet(nn.Module):
         return x
 
     def init_weights(self, pretrained=''):
-        if os.path.isfile(pretrained):
-            logger.info('=> init deconv weights from normal distribution')
-            for name, m in self.deconv_layers.named_modules():
-                if isinstance(m, nn.ConvTranspose2d):
-                    logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.normal_(m.weight, std=0.001)
-                    if self.deconv_with_bias:
-                        nn.init.constant_(m.bias, 0)
-                elif isinstance(m, nn.BatchNorm2d):
-                    logger.info('=> init {}.weight as 1'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.constant_(m.weight, 1)
+        logger.info('=> init deconv weights from normal distribution')
+        for name, m in self.deconv_layers.named_modules():
+            if isinstance(m, nn.ConvTranspose2d):
+                logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.normal_(m.weight, std=0.001)
+                if self.deconv_with_bias:
                     nn.init.constant_(m.bias, 0)
-            logger.info('=> init final conv weights from normal distribution')
-            for m in self.final_layer.modules():
-                if isinstance(m, nn.Conv2d):
-                    # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                    logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.normal_(m.weight, std=0.001)
-                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                logger.info('=> init {}.weight as 1'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+        logger.info('=> init final conv weights from normal distribution')
+        for m in self.final_layer.modules():
+            if isinstance(m, nn.Conv2d):
+                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.normal_(m.weight, std=0.001)
+                nn.init.constant_(m.bias, 0)
 
+        if os.path.isfile(pretrained):
             # pretrained_state_dict = torch.load(pretrained)
             logger.info('=> loading pretrained model {}'.format(pretrained))
             # self.load_state_dict(pretrained_state_dict, strict=False)
@@ -293,9 +293,8 @@ class PoseResNet(nn.Module):
                     'No state_dict found in checkpoint file {}'.format(pretrained))
             self.load_state_dict(state_dict, strict=False)
         else:
-            logger.error('=> imagenet pretrained model dose not exist')
-            logger.error('=> please download it first')
-            raise ValueError('imagenet pretrained model does not exist')
+            # Add initialize method
+            pass
 
 
 resnet_spec = {18: (BasicBlock, [2, 2, 2, 2]),
