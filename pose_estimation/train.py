@@ -80,6 +80,7 @@ def main():
 
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
+    print('finaloutputdir', final_output_dir)
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
@@ -106,7 +107,7 @@ def main():
     }
 
     dump_input = torch.rand((config.TRAIN.BATCH_SIZE,
-                             3,
+                             1,
                              config.MODEL.IMAGE_SIZE[1],
                              config.MODEL.IMAGE_SIZE[0]))
     writer_dict['writer'].add_graph(model, (dump_input, ), verbose=False)
@@ -130,23 +131,19 @@ def main():
                                      std=[0.229, 0.224, 0.225])
     train_dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
-        config.DATASET.ROOT,
-        config.DATASET.TRAIN_SET,
-        True,
         transforms.Compose([
             transforms.ToTensor(),
             normalize,
-        ])
+        ]),
+        True
     )
     valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
-        config.DATASET.ROOT,
-        config.DATASET.TEST_SET,
-        False,
         transforms.Compose([
             transforms.ToTensor(),
             normalize,
-        ])
+        ]),
+        False
     )
 
     train_loader = torch.utils.data.DataLoader(
@@ -173,32 +170,31 @@ def main():
         train(config, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)
 
+#        # evaluate on validation set
+        validate(config, valid_loader, model, criterion, final_output_dir,
+                tb_log_dir, epoch, writer_dict)
 
-        # evaluate on validation set
-        perf_indicator = validate(config, valid_loader, valid_dataset, model,
-                                  criterion, final_output_dir, tb_log_dir,
-                                  writer_dict)
-
-        if perf_indicator > best_perf:
-            best_perf = perf_indicator
-            best_model = True
-        else:
-            best_model = False
-
+#        if perf_indicator > best_perf:
+#            best_perf = perf_indicator
+#            best_model = True
+#        else:
+#            best_model = False
+#
         logger.info('=> saving checkpoint to {}'.format(final_output_dir))
         save_checkpoint({
             'epoch': epoch + 1,
             'model': get_model_name(config),
             'state_dict': model.state_dict(),
-            'perf': perf_indicator,
+#            'perf': perf_indicator,
             'optimizer': optimizer.state_dict(),
         }, best_model, final_output_dir)
 
-    final_model_state_file = os.path.join(final_output_dir,
-                                          'final_state.pth.tar')
-    logger.info('saving final model state to {}'.format(
-        final_model_state_file))
-    torch.save(model.module.state_dict(), final_model_state_file)
+        if epoch+1 % config.SAVE_FREQ == 0:
+            final_model_state_file = os.path.join(final_output_dir,
+                                                  f'{epoch+1}_checkpoint.pth.tar')
+            logger.info('saving final model state to {}'.format(
+                final_model_state_file))
+            torch.save(model.state_dict(), final_model_state_file)
     writer_dict['writer'].close()
 
 

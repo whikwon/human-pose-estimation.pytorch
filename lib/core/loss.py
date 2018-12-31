@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 
 import torch.nn as nn
+import torch
 
 
 class JointsMSELoss(nn.Module):
@@ -25,7 +26,7 @@ class JointsMSELoss(nn.Module):
         loss = 0
 
         for idx in range(num_joints):
-            heatmap_pred = heatmaps_pred[idx].squeeze()
+            heatmap_pred = heatmaps_pred[idx].squeeze().type(torch.cuda.DoubleTensor)
             heatmap_gt = heatmaps_gt[idx].squeeze()
             if self.use_target_weight:
                 loss += 0.5 * self.criterion(

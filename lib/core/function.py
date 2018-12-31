@@ -11,9 +11,11 @@ from __future__ import print_function
 import logging
 import time
 import os
+import math
 
 import numpy as np
 import torch
+import cv2
 
 from core.config import get_model_name
 from core.evaluate import accuracy
@@ -36,7 +38,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (input, target, target_weight, meta) in enumerate(train_loader):
+    for i, (input, target, target_weight) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
@@ -82,12 +84,12 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
             writer_dict['train_global_steps'] = global_steps + 1
 
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
-            save_debug_images(config, input, meta, target, pred*4, output,
-                              prefix)
+#            save_debug_images(config, input, meta, target, pred*4, output,
+#                              prefix)
 
 
-def validate(config, val_loader, val_dataset, model, criterion, output_dir,
-             tb_log_dir, writer_dict=None):
+def validate(config, val_loader, model, criterion, output_dir,
+             tb_log_dir, epoch, writer_dict=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     acc = AverageMeter()
@@ -95,9 +97,9 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
     # switch to evaluate mode
     model.eval()
 
-    num_samples = len(val_dataset)
-    all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
-                         dtype=np.float32)
+    num_samples = len(val_loader)
+#    all_preds = np.zeros((num_samples, config.MODEL.NUM_JOINTS, 3),
+#                         dtype=np.float32)
     all_boxes = np.zeros((num_samples, 6))
     image_path = []
     filenames = []
@@ -105,26 +107,26 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
     idx = 0
     with torch.no_grad():
         end = time.time()
-        for i, (input, target, target_weight, meta) in enumerate(val_loader):
+        for i, (input, target, target_weight) in enumerate(val_loader):
             # compute output
             output = model(input)
-            if config.TEST.FLIP_TEST:
-                # this part is ugly, because pytorch has not supported negative index
-                # input_flipped = model(input[:, :, :, ::-1])
-                input_flipped = np.flip(input.cpu().numpy(), 3).copy()
-                input_flipped = torch.from_numpy(input_flipped).cuda()
-                output_flipped = model(input_flipped)
-                output_flipped = flip_back(output_flipped.cpu().numpy(),
-                                           val_dataset.flip_pairs)
-                output_flipped = torch.from_numpy(output_flipped.copy()).cuda()
-
-                # feature is not aligned, shift flipped heatmap for higher accuracy
-                if config.TEST.SHIFT_HEATMAP:
-                    output_flipped[:, :, :, 1:] = \
-                        output_flipped.clone()[:, :, :, 0:-1]
-                    # output_flipped[:, :, :, 0] = 0
-
-                output = (output + output_flipped) * 0.5
+#            if config.TEST.FLIP_TEST:
+#                # this part is ugly, because pytorch has not supported negative index
+#                # input_flipped = model(input[:, :, :, ::-1])
+#                input_flipped = np.flip(input.cpu().numpy(), 3).copy()
+#                input_flipped = torch.from_numpy(input_flipped).cuda()
+#                output_flipped = model(input_flipped)
+#                output_flipped = flip_back(output_flipped.cpu().numpy(),
+#                                           val_dataset.flip_pairs)
+#                output_flipped = torch.from_numpy(output_flipped.copy()).cuda()
+#
+#                # feature is not aligned, shift flipped heatmap for higher accuracy
+#                if config.TEST.SHIFT_HEATMAP:
+#                    output_flipped[:, :, :, 1:] = \
+#                        output_flipped.clone()[:, :, :, 0:-1]
+#                    # output_flipped[:, :, :, 0] = 0
+#
+#                output = (output + output_flipped) * 0.5
 
             target = target.cuda(non_blocking=True)
             target_weight = target_weight.cuda(non_blocking=True)
@@ -143,24 +145,24 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
             batch_time.update(time.time() - end)
             end = time.time()
 
-            c = meta['center'].numpy()
-            s = meta['scale'].numpy()
-            score = meta['score'].numpy()
+#            c = meta['center'].numpy()
+#            s = meta['scale'].numpy()
+#            score = meta['score'].numpy()
 
-            preds, maxvals = get_final_preds(
-                config, output.clone().cpu().numpy(), c, s)
+#            preds, maxvals = get_final_preds(
+#                config, output.clone().cpu().numpy(), c, s)
 
-            all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
-            all_preds[idx:idx + num_images, :, 2:3] = maxvals
-            # double check this all_boxes parts
-            all_boxes[idx:idx + num_images, 0:2] = c[:, 0:2]
-            all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
-            all_boxes[idx:idx + num_images, 4] = np.prod(s*200, 1)
-            all_boxes[idx:idx + num_images, 5] = score
-            image_path.extend(meta['image'])
-            if config.DATASET.DATASET == 'posetrack':
-                filenames.extend(meta['filename'])
-                imgnums.extend(meta['imgnum'].numpy())
+#            all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
+#            all_preds[idx:idx + num_images, :, 2:3] = maxvals
+#            # double check this all_boxes parts
+#            all_boxes[idx:idx + num_images, 0:2] = c[:, 0:2]
+#            all_boxes[idx:idx + num_images, 2:4] = s[:, 0:2]
+#            all_boxes[idx:idx + num_images, 4] = np.prod(s*200, 1)
+#            all_boxes[idx:idx + num_images, 5] = score
+#            image_path.extend(meta['image'])
+#            if config.DATASET.DATASET == 'posetrack':
+#                filenames.extend(meta['filename'])
+#                imgnums.extend(meta['imgnum'].numpy())
 
             idx += num_images
 
@@ -173,34 +175,32 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
                           loss=losses, acc=acc)
                 logger.info(msg)
 
-                prefix = '{}_{}'.format(os.path.join(output_dir, 'val'), i)
-                save_debug_images(config, input, meta, target, pred*4, output,
-                                  prefix)
+            save_interm_result(input, output, target, output_dir, epoch)
+#            save_debug_images(config, input, target, pred*4, output,
+#                              prefix)
 
-        name_values, perf_indicator = val_dataset.evaluate(
-            config, all_preds, output_dir, all_boxes, image_path,
-            filenames, imgnums)
+#        name_values, perf_indicator = val_dataset.evaluate(
+#            config, all_preds, output_dir, all_boxes, image_path,
+#            filenames, imgnums)
 
-        _, full_arch_name = get_model_name(config)
-        if isinstance(name_values, list):
-            for name_value in name_values:
-                _print_name_value(name_value, full_arch_name)
-        else:
-            _print_name_value(name_values, full_arch_name)
+#        _, full_arch_name = get_model_name(config)
+#        if isinstance(name_values, list):
+#            for name_value in name_values:
+#                _print_name_value(name_value, full_arch_name)
+#        else:
+#            _print_name_value(name_values, full_arch_name)
 
-        if writer_dict:
-            writer = writer_dict['writer']
-            global_steps = writer_dict['valid_global_steps']
-            writer.add_scalar('valid_loss', losses.avg, global_steps)
-            writer.add_scalar('valid_acc', acc.avg, global_steps)
-            if isinstance(name_values, list):
-                for name_value in name_values:
-                    writer.add_scalars('valid', dict(name_value), global_steps)
-            else:
-                writer.add_scalars('valid', dict(name_values), global_steps)
-            writer_dict['valid_global_steps'] = global_steps + 1
-
-    return perf_indicator
+#        if writer_dict:
+#            writer = writer_dict['writer']
+#            global_steps = writer_dict['valid_global_steps']
+#            writer.add_scalar('valid_loss', losses.avg, global_steps)
+#            writer.add_scalar('valid_acc', acc.avg, global_steps)
+#            if isinstance(name_values, list):
+#                for name_value in name_values:
+#                    writer.add_scalars('valid', dict(name_value), global_steps)
+#            else:
+#                writer.add_scalars('valid', dict(name_values), global_steps)
+#            writer_dict['valid_global_steps'] = global_steps + 1
 
 
 # markdown format output
@@ -237,3 +237,44 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count if self.count != 0 else 0
+
+
+def save_interm_result(imgs, outputs, targets, save_dir, epoch):
+    """Save intermediate result during training
+
+    Args:
+        imgs (torch.Tensor): [batch_size, n_channel, width, height]
+        targets (torch.Tensor): [batch_size, n_bbox, 5]
+        save_dir (str): directory saving intermediate result
+        curr_epoch (int): current epoch number
+    """
+    def _denormalize_img(img):
+        return (img*127.5) + 127.5
+
+    num_imgs = len(imgs)
+    img_size = imgs.shape[-2], imgs.shape[-1]
+    output_size = outputs.shape[-2], outputs.shape[-1]
+
+    num_rows = math.ceil(num_imgs**0.5)
+    num_cols = round(num_imgs**0.5)
+
+    img_mask = np.zeros([img_size[0]*num_rows, img_size[1]*num_cols])
+    output_mask = np.zeros([output_size[0]*num_rows, output_size[1]*num_cols])
+    target_mask = np.zeros([output_size[0]*num_rows, output_size[1]*num_cols])
+
+    imgs_arr = imgs.cpu().data.numpy()[:, 0, :, :]
+    targets_arr = targets.cpu().data.numpy()[:, 0, :, :]
+    outputs_arr = outputs.cpu().data.numpy()[:, 0, :, :]
+
+    for i, (img, target, output) in enumerate(zip(imgs_arr, targets_arr, outputs_arr)):
+            row = i // num_cols
+            col = i % num_cols
+            img_mask[row*img_size[0]: (row+1)*img_size[0], col*img_size[1]:(col+1)*img_size[1]] = img.copy()
+            output_mask[row*output_size[0]: (row+1)*output_size[0], col*output_size[1]:(col+1)*output_size[1]] = output.copy()
+            target_mask[row*output_size[0]: (row+1)*output_size[0], col*output_size[1]:(col+1)*output_size[1]] = target.copy()
+
+
+    for i, mask in enumerate([img_mask, output_mask, target_mask]):
+        save_path = os.path.join(save_dir, f'{epoch}_{i}.jpg')
+        cv2.imwrite(save_path, _denormalize_img(mask))
+    return img_mask, output_mask, target_mask

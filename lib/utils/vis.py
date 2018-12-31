@@ -9,6 +9,7 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+import os
 
 import numpy as np
 import torchvision
@@ -116,6 +117,31 @@ def save_batch_heatmaps(batch_image, batch_heatmaps, file_name,
     cv2.imwrite(file_name, grid_image)
 
 
+#def save_debug_images(config, input, meta, target, joints_pred, output,
+#                      prefix):
+#    if not config.DEBUG.DEBUG:
+#        return
+#
+#    if config.DEBUG.SAVE_BATCH_IMAGES_GT:
+#        save_batch_image_with_joints(
+#            input, meta['joints'], meta['joints_vis'],
+#            '{}_gt.jpg'.format(prefix)
+#        )
+#    if config.DEBUG.SAVE_BATCH_IMAGES_PRED:
+#        save_batch_image_with_joints(
+#            input, joints_pred, meta['joints_vis'],
+#            '{}_pred.jpg'.format(prefix)
+#        )
+#    if config.DEBUG.SAVE_HEATMAPS_GT:
+#        save_batch_heatmaps(
+#            input, target, '{}_hm_gt.jpg'.format(prefix)
+#        )
+#    if config.DEBUG.SAVE_HEATMAPS_PRED:
+#        save_batch_heatmaps(
+#            input, output, '{}_hm_pred.jpg'.format(prefix)
+#        )
+
+
 def save_debug_images(config, input, meta, target, joints_pred, output,
                       prefix):
     if not config.DEBUG.DEBUG:
@@ -139,3 +165,44 @@ def save_debug_images(config, input, meta, target, joints_pred, output,
         save_batch_heatmaps(
             input, output, '{}_hm_pred.jpg'.format(prefix)
         )
+
+
+def save_interm_result(config, imgs, outputs, targets, save_path):
+    """Save intermediate result during training
+
+    Args:
+        imgs (torch.Tensor): [batch_size, n_channel, width, height]
+        targets (torch.Tensor): [batch_size, n_bbox, 5]
+        save_dir (str): directory saving intermediate result
+        curr_epoch (int): current epoch number
+    """
+    def _denormalize_img(img):
+        return (img*127.5) + 127.5
+
+    num_imgs = len(imgs)
+    img_size = imgs.shape[-2], imgs.shape[-1]
+    output_size = outputs.shape[-2], outputs.shape[-1]
+
+    num_rows = math.ceil(num_imgs**0.5)
+    num_cols = round(num_imgs**0.5)
+
+    img_mask = np.zeros([img_size[0]*num_rows, img_size[1]*num_cols])
+    output_mask = np.zeros([output_size[0]*num_rows, output_size[1]*num_cols])
+    target_mask = np.zeros([output_size[0]*num_rows, output_size[1]*num_cols])
+
+    imgs_arr = imgs.cpu().data.numpy()[:, 0, :, :]
+    targets_arr = targets.cpu().data.numpy()[:, 0, :, :]
+    outputs_arr = outputs.cpu().data.numpy()[:, 0, :, :]
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    for i, (img, target, output) in enumerate(zip(imgs_arr, targets_arr, outputs_arr)):
+            row = i // num_cols
+            col = i % num_cols
+            img_mask[row*img_size[0]: (row+1)*img_size[0], col*img_size[1]:(col+1)*img_size[1]] = img.copy()
+            output_mask[row*output_size[0]: (row+1)*output_size[0], col*output_size[1]:(col+1)*output_size[1]] = output.copy()
+            target_mask[row*output_size[0]: (row+1)*output_size[0], col*output_size[1]:(col+1)*output_size[1]] = target.copy()
+
+    for i, mask in enumerate([img_mask, output_mask, target_mask]):
+        cv2.imwrite(save_path, _denormalize_img(mask))
+    return img_mask, output_mask, target_mask

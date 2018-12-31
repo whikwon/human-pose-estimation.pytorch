@@ -45,10 +45,24 @@ class MedicalDataset(Dataset):
         return len(self.path_bbox_keypoint)
 
     def _add_boundary_noise(self, x1, y1, x2, y2, w, h, kx_bbox, ky_bbox):
-        dx1 = min(x1, np.random.randint(20, w//2))
-        dx2 = min(416 - x2, np.random.randint(20, w//2))
-        dy1 = min(y1, np.random.randint(20, h//2))
-        dy2 = min(416 - y2, np.random.randint(20, h//2))
+        if 20 < w//2:
+            randint_w = (20, w//2)
+        elif 20 == w//2:
+            randint_w = (19, 20)
+        else:
+            randint_w = (w//2, 20)
+
+        if 20 < h//2:
+            randint_h = (20, h//2)
+        elif 20 == h//2:
+            randint_h = (19, 20)
+        else:
+            randint_h = (h//2, 20)
+
+        dx1 = min(x1, np.random.randint(*randint_w))
+        dx2 = min(416 - x2, np.random.randint(*randint_w))
+        dy1 = min(y1, np.random.randint(*randint_h))
+        dy2 = min(416 - y2, np.random.randint(*randint_h))
 
         new_w = w + dx1 + dx2
         new_h = h + dy1 + dy2
@@ -86,15 +100,25 @@ class MedicalDataset(Dataset):
             resized_new_ky_bbox = int(new_ky_bbox * ratio_h)
 
             gaussian = make_gaussian([5, 5], 2)
-            heatmap[resized_new_ky_bbox-2: resized_new_ky_bbox+3,
-                    resized_new_kx_bbox-2: resized_new_kx_bbox+3] = gaussian
 
+            # heatmap coords adjusting gaussian
+            hx1 = max(0, resized_new_kx_bbox - 2)
+            hx2 = resized_new_kx_bbox + 3
+            hy1 = max(0, resized_new_ky_bbox - 2)
+            hy2 = resized_new_ky_bbox + 3
+
+            # gaussian adjusting coords
+            gx = max(2 - resized_new_kx_bbox, 0)
+            gy = max(2 - resized_new_ky_bbox, 0)
+
+            heatmap[hy1: hy2, hx1: hx2] = gaussian[gy:, gx:]
             resized_new_bbox = cv2.resize(new_bbox, (192, 256))
             return resized_new_bbox, heatmap
 
         resized_new_bbox, heatmap = _make_resized_img_heatmap(new_bbox, new_kx_bbox, new_ky_bbox)
         resized_new_bbox = Image.fromarray(resized_new_bbox)
         heatmap = heatmap.reshape(1, 64, 48)
+        target_weight = np.ones([1, 1])
 
         if self.is_train:
             # augmentation to keypoint
@@ -103,9 +127,7 @@ class MedicalDataset(Dataset):
         if self.transforms is not None:
             resized_new_bbox = self.transforms(resized_new_bbox)
 
-
-        sample = {'imgs': resized_new_bbox, 'heatmap': heatmap}
-        return sample
+        return [resized_new_bbox, heatmap, target_weight]
 
 
 def make_gaussian(size, sigma=10, center=None, d_type=np.float64):

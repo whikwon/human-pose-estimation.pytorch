@@ -1,15 +1,16 @@
-GPUS: '1'
+GPUS: '0'
 DATA_DIR: '/home/whikwon/Documents/github/mp_biorobot_monitoring'
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
 WORKERS: 4
-PRINT_FREQ: 100
+PRINT_FREQ: 500
+SAVE_FREQ: 2000
 
 DATASET:
   DATASET: 'medi'
   ROOT: '/home/whikwon/Documents/github/mp_biorobot_monitoring/video'
-  TEST_SET: 'val2017'
-  TRAIN_SET: 'catheter_train_list'
+  TEST_SET: 'catheter_train_list_keypoint'
+  TRAIN_SET: 'catheter_val_list_keypoint'
   FLIP: true
   ROT_FACTOR: 40
   SCALE_FACTOR: 0.3
@@ -19,7 +20,7 @@ MODEL:
   IMAGE_SIZE:
   - 192
   - 256
-  NUM_JOINTS: 17
+  NUM_JOINTS: 1
   EXTRA:
     TARGET_TYPE: 'gaussian'
     HEATMAP_SIZE:

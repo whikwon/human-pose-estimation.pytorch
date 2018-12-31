@@ -15,7 +15,7 @@ DATASET:
   SCALE_FACTOR: 0.3
 MODEL:
   NAME: 'pose_resnet'
-  PRETRAINED: 'models/pytorch/imagenet/resnet50-19c8e357.pth'
+  PRETRAINED: ''
   IMAGE_SIZE:
   - 192
   - 256

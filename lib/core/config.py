@@ -23,6 +23,7 @@ config.DATA_DIR = ''
 config.GPUS = '0'
 config.WORKERS = 4
 config.PRINT_FREQ = 20
+config.SAVE_FREQ = 100
 
 # Cudnn related params
 config.CUDNN = edict()
