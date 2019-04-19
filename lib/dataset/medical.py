@@ -7,6 +7,8 @@ import cv2
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import *
+import imgaug as ia
+from imgaug import augmenters as iaa
 
 
 logger = logging.getLogger(__name__)
@@ -111,18 +113,25 @@ class MedicalDataset(Dataset):
             gx = max(2 - resized_new_kx_bbox, 0)
             gy = max(2 - resized_new_ky_bbox, 0)
 
-            heatmap[hy1: hy2, hx1: hx2] = gaussian[gy:, gx:]
+            try:
+                heatmap[hy1: hy2, hx1: hx2] = gaussian[gy:, gx:]
+            except Exception as e:
+                logger.info('Coords exceeded boundary [{}, {}, {}, {}, {}, {}]'.format(hx1,
+                    hx2, hy1, hy2, gx, gy))
             resized_new_bbox = cv2.resize(new_bbox, (192, 256))
             return resized_new_bbox, heatmap
 
         resized_new_bbox, heatmap = _make_resized_img_heatmap(new_bbox, new_kx_bbox, new_ky_bbox)
         resized_new_bbox = Image.fromarray(resized_new_bbox)
-        heatmap = heatmap.reshape(1, 64, 48)
         target_weight = np.ones([1, 1])
 
         if self.is_train:
             # augmentation to keypoint
-            pass
+            self.img_augmentor.to_deterministic()
+            resized_new_bbox = self.img_augmentor(resized_new_bbox)
+            heatmap = self.img_augmentor(heatmap, True)
+
+        heatmap = heatmap.reshape(1, 64, 48).copy()
 
         if self.transforms is not None:
             resized_new_bbox = self.transforms(resized_new_bbox)
@@ -154,49 +163,33 @@ class ImgAugmentation(object):
     """Overall Image Augmentation using imgaug framework"""
     def __init__(self, config):
         self.config = config
-
-    def __call__(self, img, label):
-        # xywh to x1y1x2y2
-        x, y, w, h = label
-        x1, y1, x2, y2 = int(x-w/2), int(y-h/2), int(x+w/2), int(y+h/2)
-        assert x2 > x1, f"ValueError: {x2} shoulde be larger than {x1}"
-        assert y2 > y1, f"ValueError: {y2} shoulde be larger than {y1}"
-
-        img = np.stack([img]*3, axis=-1)
-
-        bbs = ia.BoundingBoxesOnImage([
-            ia.BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)],
-            shape=img.shape)
-
-        seq = iaa.Sequential([
+        self.seq = iaa.Sequential([
             iaa.Affine(
-                scale=self.config.scale,
-                translate_px=self.config.translate_px,),
-            iaa.Fliplr(p=self.config.flip_prob),
-            iaa.ContrastNormalization(self.config.contrastnorm, per_channel=0.5),
-            iaa.Sharpen(alpha=self.config.sharpen_alpha,
-                lightness=self.config.sharpen_lightness)
+                scale=self.config.DATASET.SCALE,
+                translate_percent=self.config.DATASET.TRANSLATE_PER,
+                rotate=self.config.DATASET.ROTATE),
+            iaa.Fliplr(p=self.config.DATASET.FLIP_PROB),
+            iaa.ContrastNormalization(self.config.DATASET.CONTRASTNORM, per_channel=0.5),
+            iaa.Sharpen(alpha=self.config.DATASET.SHARPEN_ALPHA,
+                lightness=self.config.DATASET.SHARPEN_LIGHT)
             ])
 
-        seq_det = seq.to_deterministic()
+        self.seq_det = self.seq.to_deterministic()
 
-        img_aug = seq_det.augment_images([img])[0]
-        bbs_aug = seq_det.augment_bounding_boxes([bbs])[0]
-
-        # get new coords
-        x1 = max(bbs_aug.bounding_boxes[0].x1, 0)
-        y1 = max(bbs_aug.bounding_boxes[0].y1, 0)
-        x2 = max(bbs_aug.bounding_boxes[0].x2, 0)
-        y2 = max(bbs_aug.bounding_boxes[0].y2, 0)
-
-        # coordination convert
-        x = (x1 + x2)/2
-        y = (y1 + y2)/2
-        w = x2 - x1
-        h = y2 - y1
-
-        label = np.array([x, y, w, h])
+    def __call__(self, img, heatmap=False):
+        # xywh to x1y1x2y2
+        img = np.stack([img]*3, axis=-1)
+        if heatmap:
+            img_aug = img.copy()
+            for aug in self.seq_det[:2]:
+                img_aug = aug.augment_images([img_aug])[0]
+#            img_aug = self.seq_det.augment_images([img])[0]
+#            img_aug = iaa.Sequential(self.seq_det[:2]).augment_images([img])[0]
+            return img_aug[:, :, 0]
+        img_aug = self.seq_det.augment_images([img])[0]
         img = img_aug[:, :, 0]
-
         img = Image.fromarray(img)
-        return img, label
+        return img
+
+    def to_deterministic(self):
+        self.seq_det = self.seq.to_deterministic()

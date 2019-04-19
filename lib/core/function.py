@@ -43,9 +43,9 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         data_time.update(time.time() - end)
 
         # compute output
-        output = model(input)
-        target = target.cuda(non_blocking=True)
-        target_weight = target_weight.cuda(non_blocking=True)
+        output = model(input.cuda())
+        target = target.cuda()
+        target_weight = target_weight.cuda()
 
         loss = criterion(output, target, target_weight)
 
@@ -109,7 +109,7 @@ def validate(config, val_loader, model, criterion, output_dir,
         end = time.time()
         for i, (input, target, target_weight) in enumerate(val_loader):
             # compute output
-            output = model(input)
+            output = model(input.cuda())
 #            if config.TEST.FLIP_TEST:
 #                # this part is ugly, because pytorch has not supported negative index
 #                # input_flipped = model(input[:, :, :, ::-1])
@@ -128,8 +128,8 @@ def validate(config, val_loader, model, criterion, output_dir,
 #
 #                output = (output + output_flipped) * 0.5
 
-            target = target.cuda(non_blocking=True)
-            target_weight = target_weight.cuda(non_blocking=True)
+            target = target.cuda()
+            target_weight = target_weight.cuda()
 
             loss = criterion(output, target, target_weight)
 
@@ -166,16 +166,15 @@ def validate(config, val_loader, model, criterion, output_dir,
 
             idx += num_images
 
-            if i % config.PRINT_FREQ == 0:
-                msg = 'Test: [{0}/{1}]\t' \
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t' \
-                      'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
-                          i, len(val_loader), batch_time=batch_time,
-                          loss=losses, acc=acc)
-                logger.info(msg)
+        msg = 'Test: [{0}/{1}]\t' \
+              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
+              'Loss {loss.avg:.4f}\t' \
+              'Accuracy {acc.avg:.3f}'.format(
+                  i, len(val_loader), batch_time=batch_time,
+                  loss=losses, acc=acc)
+        logger.info(msg)
 
-            save_interm_result(input, output, target, output_dir, epoch)
+        save_interm_result(input, output, target, output_dir, epoch)
 #            save_debug_images(config, input, target, pred*4, output,
 #                              prefix)
 

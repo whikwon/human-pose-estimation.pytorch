@@ -111,9 +111,7 @@ def main():
                              config.MODEL.IMAGE_SIZE[1],
                              config.MODEL.IMAGE_SIZE[0]))
     writer_dict['writer'].add_graph(model, (dump_input, ), verbose=False)
-
-    gpus = [int(i) for i in config.GPUS.split(',')]
-    model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
+    model = model.cuda()
 
     # define loss function (criterion) and optimizer
     criterion = JointsMSELoss(
@@ -127,8 +125,8 @@ def main():
     )
 
     # Data loading code
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
+                                     std=[0.5, 0.5, 0.5])
     train_dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
         transforms.Compose([
@@ -148,14 +146,14 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE*len(gpus),
+        batch_size=config.TRAIN.BATCH_SIZE,
         shuffle=config.TRAIN.SHUFFLE,
         num_workers=config.WORKERS,
         pin_memory=True
     )
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
-        batch_size=config.TEST.BATCH_SIZE*len(gpus),
+        batch_size=config.TEST.BATCH_SIZE,
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True
@@ -170,28 +168,28 @@ def main():
         train(config, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)
 
-#        # evaluate on validation set
-        validate(config, valid_loader, model, criterion, final_output_dir,
-                tb_log_dir, epoch, writer_dict)
+        if (epoch+1) % config.SAVE_FREQ == 0:
+    #        # evaluate on validation set
+            validate(config, valid_loader, model, criterion, final_output_dir,
+                    tb_log_dir, epoch, writer_dict)
 
-#        if perf_indicator > best_perf:
-#            best_perf = perf_indicator
-#            best_model = True
-#        else:
-#            best_model = False
-#
-        logger.info('=> saving checkpoint to {}'.format(final_output_dir))
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'model': get_model_name(config),
-            'state_dict': model.state_dict(),
-#            'perf': perf_indicator,
-            'optimizer': optimizer.state_dict(),
-        }, best_model, final_output_dir)
+    #        if perf_indicator > best_perf:
+    #            best_perf = perf_indicator
+    #            best_model = True
+    #        else:
+    #            best_model = False
+    #
+            logger.info('=> saving checkpoint to {}'.format(final_output_dir))
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'model': get_model_name(config),
+                'state_dict': model.state_dict(),
+    #            'perf': perf_indicator,
+                'optimizer': optimizer.state_dict(),
+            }, best_model, final_output_dir)
 
-        if epoch+1 % config.SAVE_FREQ == 0:
             final_model_state_file = os.path.join(final_output_dir,
-                                                  f'{epoch+1}_checkpoint.pth.tar')
+                                                  f'checkpoint.pth.tar')
             logger.info('saving final model state to {}'.format(
                 final_model_state_file))
             torch.save(model.state_dict(), final_model_state_file)

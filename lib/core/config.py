@@ -72,9 +72,13 @@ config.DATASET.HYBRID_JOINTS_TYPE = ''
 config.DATASET.SELECT_DATA = False
 
 # training data augmentation
-config.DATASET.FLIP = True
-config.DATASET.SCALE_FACTOR = 0.25
-config.DATASET.ROT_FACTOR = 30
+config.DATASET.SCALE = [0.9, 1.1]
+config.DATASET.TRANSLATE_PER = {"x": (-0.05, 0.1), "y": (-0.05, 0.1)}
+config.DATASET.ROTATE = (-15, 15)
+config.DATASET.FLIP_PROB = 0.5
+config.DATASET.CONTRASTNORM = [0.8, 1.2]
+config.DATASET.SHARPEN_ALPHA = [0.1, 0.2]
+config.DATASET.SHARPEN_LIGHT = [0.8, 1.2]
 
 # train
 config.TRAIN = edict()
