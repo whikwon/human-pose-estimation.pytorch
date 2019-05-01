@@ -15,26 +15,34 @@ logger = logging.getLogger(__name__)
 
 def load_dataset(data_root, data_list):
     img_path_bbox_coords = []
-    data_list = os.path.join(data_root, data_list)
+    data_list = os.path.join(data_root, 'annotations', data_list)
 
     with open(data_list, 'r') as f:
         lines = f.read().split()
-        lines = [i.split(',') for i in lines]
-    img_path_bbox_coords.extend(lines)
 
-    # adjust file path
-    for img_path_bbox_coord in img_path_bbox_coords:
-        img_path_bbox_coord[0] = os.path.join(data_root,
-            img_path_bbox_coord[0][8:])
+    for l in lines:
+        img_name, c_x, c_y, w, h, k_x, k_y = l.split(',')
+        c_x = float(c_x)
+        c_y = float(c_y)
+        w = float(w)
+        h = float(h)
+        k_x = float(k_x)
+        k_y = float(k_y)
+        img_path = os.path.join(data_root, 'images', img_name)
+
+        img_path_bbox_coords.append([img_path, c_x, c_y, w, h, k_x, k_y])
+
     return img_path_bbox_coords
 
 
 class MedicalDataset(Dataset):
 
-    def __init__(self, config, transforms=None, is_train=True):
+    def __init__(self, config, transforms=None, is_train=True,
+            img_size=(512, 512)):
         self.config = config
         self.transforms = transforms
         self.is_train = is_train
+        self.w, self.h = img_size
         if is_train:
             self.path_bbox_keypoint = load_dataset(config.DATASET.ROOT,
                 config.DATASET.TRAIN_SET)
@@ -62,9 +70,9 @@ class MedicalDataset(Dataset):
             randint_h = (h//2, 20)
 
         dx1 = min(x1, np.random.randint(*randint_w))
-        dx2 = min(416 - x2, np.random.randint(*randint_w))
+        dx2 = min(self.w - x2, np.random.randint(*randint_w))
         dy1 = min(y1, np.random.randint(*randint_h))
-        dy2 = min(416 - y2, np.random.randint(*randint_h))
+        dy2 = min(self.h - y2, np.random.randint(*randint_h))
 
         new_w = w + dx1 + dx2
         new_h = h + dy1 + dy2
@@ -79,11 +87,11 @@ class MedicalDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path, cx, cy, w, h, kx, ky = self.path_bbox_keypoint[idx]
-        img = np.array(Image.open(img_path))
+        img = np.array(Image.open(img_path))[:, :, 0]
 
         cx, cy, w, h = int(float(cx)), int(float(cy)), int(float(w)), int(float(h))
         kx, ky = int(kx), int(ky)
-        x1, y1, x2, y2 = max(cx-w//2, 0), max(cy-h//2, 0), min(cx+w//2, 416), min(cy+h//2, 416)
+        x1, y1, x2, y2 = max(cx-w//2, 0), max(cy-h//2, 0), min(cx+w//2, self.w), min(cy+h//2, self.h)
         kx_bbox, ky_bbox = kx - x1, ky - y1  # keypoint in the bbox
 
         new_x1, new_x2, new_y1, new_y2, \

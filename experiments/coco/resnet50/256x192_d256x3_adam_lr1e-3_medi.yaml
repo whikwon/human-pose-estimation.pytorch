@@ -1,5 +1,6 @@
 GPUS: '0'
 DATA_DIR: '/home/whikwon/Documents/github/mp_biorobot_monitoring'
+# DATA_DIR: '/home/whikwon/Documents/github/human-pose-estimation.pytorch/data/mpct'
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
 WORKERS: 1
@@ -8,9 +9,12 @@ SAVE_FREQ: 5
 
 DATASET:
   DATASET: 'medi'
-  ROOT: '/home/whikwon/Documents/github/mp_biorobot_monitoring/video'
-  TEST_SET: 'catheter_val_list_keypoint'
-  TRAIN_SET: 'catheter_train_list_keypoint'
+#  ROOT: '/home/whikwon/Documents/github/mp_biorobot_monitoring/video'
+#  TEST_SET: 'catheter_val_list_keypoint'
+#  TRAIN_SET: 'catheter_train_list_keypoint'
+  ROOT: '/home/whikwon/Documents/github/human-pose-estimation.pytorch/data/mpct'
+  TEST_SET: 'mpct_val.csv'
+  TRAIN_SET: 'mpct_train.csv'
 MODEL:
   NAME: 'pose_resnet'
   PRETRAINED: ''
